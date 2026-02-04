@@ -24,7 +24,19 @@ An FPV drone flying game with procedurally generated Minecraft-style voxel world
    - **Esc** — Pause
 5. If you plug in a gamepad, it's automatically detected (see Controller Setup below)
 
-### Build APK for Android
+### Get APK Without a PC (GitHub Actions)
+
+The repo has a CI workflow that builds the APK automatically in the cloud:
+
+1. Push any change to the `game/` folder (or click **Actions → Build Android APK → Run workflow** on GitHub)
+2. Wait for the build to finish (green checkmark)
+3. Go to the **Actions** tab → click the latest run → scroll to **Artifacts**
+4. Download `fpv-voxel-android.zip` — it contains the APK
+5. Transfer to your phone, install (enable "Install from unknown sources"), done
+
+No PC, no SDK, no Godot install required — GitHub builds it for you.
+
+### Build APK Locally (With a PC)
 
 1. In Godot, go to **Editor → Manage Export Templates** → download the Android template
 2. Install [Android SDK](https://developer.android.com/studio) (or just the command-line tools)
