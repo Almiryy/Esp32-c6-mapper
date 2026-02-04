@@ -13,7 +13,7 @@ A **first-person-view (FPV) drone flying game** with **procedurally generated vo
 | **Engine** | **Godot 4.3+** (GDScript + GDExtension/C++ for hot paths) | Open-source, lightweight (~40 MB export), first-class mobile support, built-in Vulkan & OpenGL ES 3.0 renderers, active community |
 | **Language** | GDScript (gameplay) + C++ via GDExtension (terrain gen, meshing, physics) | GDScript for fast iteration; C++ for performance-critical voxel operations |
 | **Noise library** | FastNoiseLite (bundled in Godot) | Zero-dependency procedural noise for terrain |
-| **Input** | Godot Input system + custom FPV controller mapping | Supports Bluetooth/USB gamepads natively; CRSF/ELRS via companion ESP32 bridge |
+| **Input** | Godot Input system + custom FPV controller mapping | Supports Bluetooth/USB gamepads natively; ELRS controllers via USB joystick mode |
 | **Target platforms** | Android (primary), iOS (secondary) | Godot exports to both from one codebase |
 
 ### Why Godot over Unity/Unreal
@@ -155,9 +155,8 @@ DroneRoot (RigidBody3D)
 #### Supported Controllers
 1. **Bluetooth gamepads** — Direct Android/iOS pairing (Xbox, PS, generic)
 2. **USB OTG gamepads** — Android wired connection
-3. **FPV Radio as gamepad** — RadioMaster/TBS controllers in joystick mode over USB
-4. **ESP32-C6 bridge** (custom hardware) — Receives ELRS/CRSF signal, outputs as BLE gamepad to phone
-5. **Touch controls** (fallback) — On-screen dual sticks
+3. **FPV Radio as gamepad** — RadioMaster/TBS/ELRS controllers in joystick mode over USB
+4. **Touch controls** (fallback) — On-screen dual sticks
 
 #### Stick Mapping (Mode 2 — FPV Standard)
 ```
@@ -176,16 +175,6 @@ func process_stick(raw: float, deadzone: float, expo: float, rate: float) -> flo
     var curved = input * (1.0 - expo + expo * input * input)  # expo curve
     return curved * rate
 ```
-
-#### ESP32-C6 Bridge (Optional Hardware Companion)
-```
-FPV Radio (ELRS/CRSF) ──RF──▶ ESP32-C6 ──BLE──▶ Phone
-                                  │
-                                  └── Presents as BLE Gamepad (HID)
-```
-- Firmware: C++ / Arduino framework
-- Protocol: Parse CRSF frames → map channels → BLE HID gamepad reports
-- Latency target: < 10ms radio-to-phone
 
 ### 4.5 Rendering & Mobile Optimization
 
@@ -349,19 +338,6 @@ Esp32-c6-mapper/
 │   │
 │   └── addons/                    # Third-party if needed
 │
-├── esp32_bridge/                  # ESP32-C6 firmware (optional)
-│   ├── platformio.ini
-│   ├── src/
-│   │   ├── main.cpp
-│   │   ├── crsf_parser.cpp
-│   │   ├── crsf_parser.h
-│   │   ├── ble_gamepad.cpp
-│   │   └── ble_gamepad.h
-│   └── README.md
-│
-├── docs/
-│   └── controller_setup.md
-│
 ├── GAME_PLAN.md                   # This file
 ├── README.md
 └── LICENSE
@@ -404,15 +380,7 @@ Esp32-c6-mapper/
 
 **Deliverable**: Authentic FPV flying experience with controller support
 
-### Phase 4 — ESP32-C6 Bridge (Optional Hardware)
-- [ ] CRSF/ELRS parser on ESP32-C6
-- [ ] BLE HID gamepad output
-- [ ] Latency testing & optimization
-- [ ] Pairing flow in game UI
-
-**Deliverable**: Fly with real FPV radio via ESP32-C6 bridge
-
-### Phase 5 — Game Features & Polish
+### Phase 4 — Game Features & Polish
 - [ ] Objectives: races (ring gates), exploration challenges
 - [ ] Procedural race track generation
 - [ ] Time trials with leaderboards (local)
@@ -459,7 +427,7 @@ Esp32-c6-mapper/
 |---|---|---|
 | Greedy meshing too slow in GDScript | Unplayable FPS | Start GDScript, port to C++ GDExtension in Phase 2 |
 | Too many draw calls on mobile | Low FPS, heat | Single atlas material, frustum culling, strict chunk budget |
-| BLE gamepad latency > 20ms | Poor flight feel | Optimize ESP32 firmware, test with BLE 5.0, fallback to USB |
+| USB gamepad latency | Poor flight feel | Test with ELRS controllers in USB joystick mode, minimize input processing |
 | Memory pressure on low-end phones | Crashes | Chunk pooling, adaptive render distance, test on 2GB RAM devices |
 | Godot mobile export bugs | Broken builds | Use stable Godot release, test early & often on real devices |
 
@@ -470,7 +438,7 @@ Esp32-c6-mapper/
 - **Unit tests**: Noise output consistency, meshing correctness (GdUnit4)
 - **Performance profiling**: Godot built-in profiler + Android GPU profiler
 - **Device testing matrix**: Low-end (2GB RAM, Mali GPU), Mid-range, High-end
-- **Input testing**: Touch, Bluetooth gamepad, USB gamepad, ESP32 bridge
+- **Input testing**: Touch, Bluetooth gamepad, USB gamepad (ELRS)
 - **Automated builds**: GitHub Actions with Godot headless export
 
 ---
@@ -482,7 +450,6 @@ Esp32-c6-mapper/
 | Godot 4.3+ | Game engine |
 | SCons | C++ GDExtension build |
 | Android SDK/NDK | Mobile export |
-| PlatformIO | ESP32-C6 firmware build |
 | GdUnit4 | GDScript unit testing |
 | GitHub Actions | CI/CD pipeline |
 | ADB | Android device debugging |
