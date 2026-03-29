@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SkyCheck Slovenia</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0F172A;
+      color: #fff;
+      overflow: hidden;
+      height: 100vh;
+      height: 100dvh;
+    }
+    #map {
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      z-index: 1;
+    }
+
+    /* Status Banner */
+    #status-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      padding: 12px 16px;
+      padding-top: max(12px, env(safe-area-inset-top));
+      text-align: center;
+      transition: background-color 0.3s;
+      background: #374151;
+    }
+    #status-banner.clear { background: #16A34A; }
+    #status-banner.restricted { background: #F59E0B; color: #000; }
+    #status-banner.nofly { background: #DC2626; }
+    #status-label {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+    #status-message {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-top: 2px;
+    }
+
+    /* Bottom Panel */
+    #bottom-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: #1E293B;
+      border-radius: 16px 16px 0 0;
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      max-height: 55vh;
+      overflow-y: auto;
+      transition: transform 0.3s;
+    }
+    #bottom-panel.collapsed {
+      max-height: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .drag-handle {
+      width: 36px;
+      height: 4px;
+      background: #475569;
+      border-radius: 2px;
+      margin: 0 auto 10px;
+    }
+
+    /* Cards */
+    .card {
+      background: #0F172A;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .card-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+    }
+    .card-row-label { color: #94A3B8; font-size: 13px; }
+    .card-row-value { color: #E2E8F0; font-size: 13px; font-weight: 500; }
+
+    .weather-good { color: #16A34A; }
+    .weather-bad { color: #DC2626; }
+    .warning-text { color: #FBBF24; font-size: 12px; margin-top: 4px; }
+
+    /* Sun times row */
+    .sun-row {
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+    }
+    .sun-item-icon { font-size: 18px; color: #FBBF24; }
+    .sun-item-time { color: #fff; font-size: 15px; font-weight: 600; margin-top: 2px; }
+    .sun-item-label { color: #94A3B8; font-size: 11px; }
+    .golden-bar {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #334155;
+      text-align: center;
+      color: #94A3B8;
+      font-size: 12px;
+    }
+    .golden-active {
+      color: #FBBF24;
+      font-weight: 600;
+      background: rgba(251,191,36,0.15);
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 6px;
+    }
+
+    /* Buttons */
+    .map-btn {
+      position: fixed;
+      z-index: 999;
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      background: #1E293B;
+      border: none;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+    #btn-locate { right: 14px; top: 80px; }
+    #btn-toggle { right: 14px; top: 132px; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #334155;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748B;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .tab.active { color: #60A5FA; border-bottom-color: #60A5FA; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Legend */
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+    }
+    .legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .legend-label { font-size: 13px; color: #CBD5E1; }
+
+    /* Zone popup */
+    .zone-popup-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+    .zone-popup-desc { font-size: 12px; color: #666; }
+    .zone-popup-alt { font-size: 12px; color: #B45309; margin-top: 4px; }
+
+    /* Loading */
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: #0F172A;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.5s;
+    }
+    #loading.hidden { opacity: 0; pointer-events: none; }
+    #loading h1 { font-size: 24px; margin-bottom: 4px; }
+    #loading p { color: #94A3B8; font-size: 14px; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #334155;
+      border-top-color: #60A5FA;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading">
+  <div class="spinner"></div>
+  <h1>SkyCheck Slovenia</h1>
+  <p>Loading drone zones...</p>
+</div>
+
+<!-- Status Banner -->
+<div id="status-banner">
+  <div id="status-label">LOCATING...</div>
+  <div id="status-message">Getting your GPS position</div>
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<!-- Buttons -->
+<button class="map-btn" id="btn-locate" onclick="centerOnUser()">📍</button>
+<button class="map-btn" id="btn-toggle" onclick="togglePanel()">📊</button>
+
+<!-- Bottom Panel -->
+<div id="bottom-panel">
+  <div class="drag-handle"></div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('weather')">Weather</div>
+    <div class="tab" onclick="switchTab('sun')">Sun</div>
+    <div class="tab" onclick="switchTab('zones')">Zones</div>
+  </div>
+
+  <!-- Weather Tab -->
+  <div id="tab-weather" class="tab-content active">
+    <div class="card" id="weather-card">
+      <div class="card-title">Weather</div>
+      <p style="color:#94A3B8; font-size:13px;">Waiting for location...</p>
+    </div>
+  </div>
+
+  <!-- Sun Tab -->
+  <div id="tab-sun" class="tab-content">
+    <div class="card" id="sun-card">
+      <div class="card-title">Sun Times</div>
+      <p style="color:#94A3B8; font-size:13px;">Waiting for location...</p>
+    </div>
+  </div>
+
+  <!-- Zones Tab -->
+  <div id="tab-zones" class="tab-content">
+    <div class="card">
+      <div class="card-title">Zone Legend</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#DC2626"></div><div><div class="legend-label"><b>No-Fly Zone</b></div><div style="font-size:11px;color:#64748B">Airports, military, nuclear - flights prohibited</div></div></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#B91C1C"></div><div><div class="legend-label"><b>Control Zone (CTR)</b></div><div style="font-size:11px;color:#64748B">Airport control zone - ATC authorization required</div></div></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#FB923C"></div><div><div class="legend-label"><b>National Park</b></div><div style="font-size:11px;color:#64748B">Authorization from park authority required</div></div></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#F59E0B"></div><div><div class="legend-label"><b>Restricted Zone</b></div><div style="font-size:11px;color:#64748B">Populated area - open category flights limited</div></div></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#EAB308"></div><div><div class="legend-label"><b>Altitude Limited</b></div><div style="font-size:11px;color:#64748B">Max altitude reduced to 50m AGL</div></div></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#16A34A"></div><div><div class="legend-label"><b>Clear Area</b></div><div style="font-size:11px;color:#64748B">OK to fly - max 120m AGL</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Key Rules (EU 2019/947)</div>
+      <div style="font-size:13px;color:#CBD5E1;line-height:1.6">
+        &#8226; Max altitude: 120m AGL (50m near airports)<br>
+        &#8226; Maintain Visual Line of Sight (VLOS)<br>
+        &#8226; Registration required for drones &gt;250g or with camera<br>
+        &#8226; Insurance min. 1,000,000 EUR<br>
+        &#8226; Do not fly over people<br>
+        &#8226; Give way to manned aircraft<br>
+        &#8226; National parks require authorization<br>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Useful Links</div>
+      <a href="https://www.caa.si/en/unmanned-aircraft-system.html" target="_blank" style="display:block;color:#60A5FA;padding:6px 0;font-size:14px">CAA Slovenia - UAS Info &#8594;</a>
+      <a href="https://caa-slovenia.maps.arcgis.com/apps/webappviewer/index.html?id=25ba69037c264c5faa5381174f76f861" target="_blank" style="display:block;color:#60A5FA;padding:6px 0;font-size:14px">Official CAA Drone Zone Map &#8594;</a>
+      <a href="https://uas.caa.si/en/login/" target="_blank" style="display:block;color:#60A5FA;padding:6px 0;font-size:14px">UAS Registration Portal &#8594;</a>
+    </div>
+    <p style="color:#475569;font-size:10px;text-align:center;margin-top:8px">Informational only. Always verify with official CAA map before flying.</p>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ========== ZONE DATA ==========
+function generateCircle(lat, lng, radiusM, n = 36) {
+  const coords = [];
+  const R = 6371000;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 2 * Math.PI;
+    const dLat = (radiusM * Math.cos(a)) / R;
+    const dLng = (radiusM * Math.sin(a)) / (R * Math.cos(lat * Math.PI / 180));
+    coords.push([lat + dLat * 180 / Math.PI, lng + dLng * 180 / Math.PI]);
+  }
+  coords.push(coords[0]); // close
+  return coords;
+}
+
+const ZONES = [
+  {
+    id: "ljlj-ctr", name: "Ljubljana Airport CTR", type: "CTR",
+    desc: "Control zone around Ljubljana Joze Pucnik Airport. ATC authorization required.", maxAlt: 0,
+    coords: [[46.3037,14.3276],[46.3037,14.5876],[46.1437,14.5876],[46.1437,14.3276]]
+  },
+  {
+    id: "ljlj-nfz", name: "Ljubljana Airport No-Fly Zone", type: "NO_FLY",
+    desc: "No drone flights within immediate airport vicinity.", maxAlt: 0,
+    coords: generateCircle(46.2237, 14.4576, 2500)
+  },
+  {
+    id: "ljmb-ctr", name: "Maribor Airport CTR", type: "CTR",
+    desc: "Control zone around Maribor Edvard Rusjan Airport.", maxAlt: 0,
+    coords: [[46.5499,15.5861],[46.5499,15.7861],[46.4099,15.7861],[46.4099,15.5861]]
+  },
+  {
+    id: "ljmb-nfz", name: "Maribor Airport No-Fly Zone", type: "NO_FLY",
+    desc: "No drone flights within immediate airport vicinity.", maxAlt: 0,
+    coords: generateCircle(46.4799, 15.6861, 2500)
+  },
+  {
+    id: "ljpz-ctr", name: "Portoroz Airport CTR", type: "CTR",
+    desc: "Control zone around Portoroz Airport.", maxAlt: 0,
+    coords: [[45.5234,13.5450],[45.5234,13.6850],[45.4234,13.6850],[45.4234,13.5450]]
+  },
+  {
+    id: "tnp", name: "Triglav National Park", type: "NATIONAL_PARK",
+    desc: "Authorization from park authority required for drone flights.",
+    coords: [[46.46,13.65],[46.48,13.75],[46.47,13.85],[46.44,13.95],[46.40,14.02],[46.35,14.05],[46.30,14.02],[46.28,13.95],[46.29,13.85],[46.30,13.75],[46.32,13.68],[46.38,13.62],[46.42,13.63]]
+  },
+  {
+    id: "nek", name: "Krsko Nuclear Power Plant", type: "NO_FLY",
+    desc: "No-fly zone around Krsko Nuclear Power Plant.", maxAlt: 0,
+    coords: generateCircle(45.9392, 15.5164, 3000)
+  },
+  {
+    id: "lj-city", name: "Ljubljana City Center", type: "RESTRICTED",
+    desc: "Populated area. Open category flights over people not permitted.", maxAlt: 50,
+    coords: generateCircle(46.0569, 14.5058, 3000)
+  },
+  {
+    id: "mb-city", name: "Maribor City Center", type: "RESTRICTED",
+    desc: "Populated area. Open category flights over people not permitted.", maxAlt: 50,
+    coords: generateCircle(46.5547, 15.6459, 2000)
+  },
+  {
+    id: "ljlj-alt", name: "Ljubljana Airport Altitude Restriction", type: "ALTITUDE_LIMIT",
+    desc: "Reduced maximum altitude of 50m AGL in airport vicinity.", maxAlt: 50,
+    coords: generateCircle(46.2237, 14.4576, 5000)
+  },
+];
+
+const ZONE_COLORS = {
+  NO_FLY: { fill: "rgba(220,38,38,0.3)", stroke: "#DC2626" },
+  CTR: { fill: "rgba(220,38,38,0.25)", stroke: "#B91C1C" },
+  MILITARY: { fill: "rgba(220,38,38,0.3)", stroke: "#991B1B" },
+  DANGER: { fill: "rgba(220,38,38,0.35)", stroke: "#7F1D1D" },
+  RESTRICTED: { fill: "rgba(245,158,11,0.3)", stroke: "#F59E0B" },
+  NATIONAL_PARK: { fill: "rgba(251,146,60,0.3)", stroke: "#FB923C" },
+  ALTITUDE_LIMIT: { fill: "rgba(234,179,8,0.2)", stroke: "#EAB308" },
+};
+
+// ========== MAP SETUP ==========
+const map = L.map('map', {
+  center: [46.15, 14.99],
+  zoom: 8,
+  zoomControl: false
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap',
+  maxZoom: 18,
+}).addTo(map);
+
+// Draw zones
+ZONES.forEach(zone => {
+  const colors = ZONE_COLORS[zone.type] || ZONE_COLORS.RESTRICTED;
+  const poly = L.polygon(zone.coords, {
+    fillColor: colors.fill,
+    fillOpacity: 0.5,
+    color: colors.stroke,
+    weight: 2,
+  }).addTo(map);
+
+  let popupHtml = `<div class="zone-popup-name">${zone.name}</div><div class="zone-popup-desc">${zone.desc}</div>`;
+  if (zone.maxAlt !== undefined) {
+    popupHtml += `<div class="zone-popup-alt">Max altitude: ${zone.maxAlt}m AGL</div>`;
+  }
+  poly.bindPopup(popupHtml);
+});
+
+// ========== GPS ==========
+let userMarker = null;
+let userCircle = null;
+let userLat = null, userLng = null;
+
+function onLocationFound(lat, lng, accuracy) {
+  userLat = lat;
+  userLng = lng;
+
+  if (!userMarker) {
+    userMarker = L.circleMarker([lat, lng], {
+      radius: 8, fillColor: '#3B82F6', fillOpacity: 1,
+      color: '#fff', weight: 3
+    }).addTo(map);
+    userCircle = L.circle([lat, lng], {
+      radius: accuracy, fillColor: '#3B82F6', fillOpacity: 0.1,
+      color: '#3B82F6', weight: 1
+    }).addTo(map);
+    map.setView([lat, lng], 13);
+  } else {
+    userMarker.setLatLng([lat, lng]);
+    userCircle.setLatLng([lat, lng]).setRadius(accuracy);
+  }
+
+  checkZones(lat, lng);
+  fetchWeather(lat, lng);
+  updateSunTimes(lat, lng);
+}
+
+// Point-in-polygon (ray casting)
+function pointInPolygon(lat, lng, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    const intersect = ((yi > lng) !== (yj > lng)) &&
+      (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function checkZones(lat, lng) {
+  const matched = ZONES.filter(z => pointInPolygon(lat, lng, z.coords));
+  const banner = document.getElementById('status-banner');
+  const label = document.getElementById('status-label');
+  const msg = document.getElementById('status-message');
+
+  if (matched.length === 0) {
+    banner.className = 'clear';
+    label.textContent = '✓ CLEAR TO FLY';
+    msg.textContent = 'Max altitude: 120m AGL';
+    return;
+  }
+
+  const hasNoFly = matched.some(z => ['NO_FLY','CTR','MILITARY','DANGER'].includes(z.type));
+  if (hasNoFly) {
+    banner.className = 'nofly';
+    label.textContent = '✕ NO FLY ZONE';
+    msg.textContent = matched.map(z => z.name).join(', ');
+  } else {
+    banner.className = 'restricted';
+    label.textContent = '⚠ RESTRICTED';
+    const minAlt = Math.min(...matched.map(z => z.maxAlt ?? 120));
+    msg.textContent = matched.map(z => z.name).join(', ') + (minAlt < 120 ? ` | Max: ${minAlt}m` : '');
+  }
+}
+
+// Start GPS
+if ('geolocation' in navigator) {
+  navigator.geolocation.watchPosition(
+    pos => onLocationFound(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+    err => {
+      document.getElementById('status-label').textContent = 'GPS UNAVAILABLE';
+      document.getElementById('status-message').textContent = 'Enable location in browser settings';
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+// ========== WEATHER ==========
+let lastWeatherFetch = 0;
+async function fetchWeather(lat, lng) {
+  if (Date.now() - lastWeatherFetch < 60000) return; // max once per minute
+  lastWeatherFetch = Date.now();
+
+  try {
+    const params = new URLSearchParams({
+      latitude: lat, longitude: lng,
+      current: 'temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation,cloud_cover,visibility,relative_humidity_2m',
+      wind_speed_unit: 'ms', timezone: 'auto'
+    });
+    const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+    const data = await resp.json();
+    const c = data.current;
+
+    const windDirs = ['N','NE','E','SE','S','SW','W','NW'];
+    const windDir = windDirs[Math.round((c.wind_direction_10m || 0) / 45) % 8];
+    const good = c.wind_speed_10m <= 10 && c.wind_gusts_10m <= 15 && c.visibility >= 3000 && c.precipitation <= 0.5;
+
+    let html = `<div class="card-title">Weather</div>`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center">`;
+    html += `<div><span style="font-size:18px;font-weight:700">${Math.round(c.temperature_2m)}°C</span>`;
+    html += `<span style="margin-left:8px;color:${good ? '#16A34A' : '#DC2626'};font-size:13px">${good ? '● Good for flying' : '● Not ideal'}</span></div>`;
+    html += `<div style="color:#CBD5E1;font-size:14px">${c.wind_speed_10m.toFixed(1)} m/s ${windDir}</div>`;
+    html += `</div>`;
+
+    // Warnings
+    const warnings = [];
+    if (c.wind_speed_10m > 10) warnings.push(`High wind: ${c.wind_speed_10m.toFixed(1)} m/s`);
+    if (c.wind_gusts_10m > 15) warnings.push(`Strong gusts: ${c.wind_gusts_10m.toFixed(1)} m/s`);
+    if (c.visibility < 3000) warnings.push(`Low visibility: ${(c.visibility/1000).toFixed(1)} km`);
+    if (c.precipitation > 0.5) warnings.push(`Rain: ${c.precipitation.toFixed(1)} mm/h`);
+    if (warnings.length) html += `<div class="warning-text">⚠ ${warnings.join(' | ')}</div>`;
+
+    // Details
+    html += `<div style="margin-top:8px;border-top:1px solid #334155;padding-top:6px">`;
+    html += row('Wind Speed', `${c.wind_speed_10m.toFixed(1)} m/s`);
+    html += row('Gusts', `${c.wind_gusts_10m.toFixed(1)} m/s`);
+    html += row('Direction', `${c.wind_direction_10m}° (${windDir})`);
+    html += row('Visibility', `${(c.visibility/1000).toFixed(1)} km`);
+    html += row('Cloud Cover', `${c.cloud_cover}%`);
+    html += row('Humidity', `${c.relative_humidity_2m}%`);
+    html += row('Precipitation', `${c.precipitation.toFixed(1)} mm/h`);
+    html += `</div>`;
+
+    document.getElementById('weather-card').innerHTML = html;
+  } catch (e) {
+    document.getElementById('weather-card').innerHTML = `<div class="card-title">Weather</div><p style="color:#94A3B8;font-size:13px">Failed to load weather data</p>`;
+  }
+}
+
+function row(label, value) {
+  return `<div class="card-row"><span class="card-row-label">${label}</span><span class="card-row-value">${value}</span></div>`;
+}
+
+// ========== SUN TIMES ==========
+function updateSunTimes(lat, lng) {
+  // Simple sun calculation (approximation)
+  const now = new Date();
+  const dayOfYear = Math.floor((now - new Date(now.getFullYear(),0,0)) / 86400000);
+  const decl = -23.45 * Math.cos(2 * Math.PI / 365 * (dayOfYear + 10));
+  const latRad = lat * Math.PI / 180;
+  const declRad = decl * Math.PI / 180;
+  const ha = Math.acos(-Math.tan(latRad) * Math.tan(declRad)) * 180 / Math.PI;
+  const noon = 12 - lng / 15; // approximate solar noon in UTC
+  const offset = now.getTimezoneOffset() / -60;
+  const solarNoon = noon + offset;
+  const sunriseH = solarNoon - ha / 15;
+  const sunsetH = solarNoon + ha / 15;
+
+  const fmt = h => {
+    const hrs = Math.floor(h);
+    const mins = Math.round((h - hrs) * 60);
+    return `${hrs.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}`;
+  };
+
+  const goldenMorningEnd = sunriseH + 1;
+  const goldenEveningStart = sunsetH - 1;
+  const currentH = now.getHours() + now.getMinutes() / 60;
+  const isGolden = (currentH >= sunriseH && currentH <= goldenMorningEnd) || (currentH >= goldenEveningStart && currentH <= sunsetH);
+
+  let html = `<div class="card-title">Sun Times</div>`;
+  html += `<div class="sun-row">`;
+  html += `<div><div class="sun-item-icon">↑</div><div class="sun-item-time">${fmt(sunriseH)}</div><div class="sun-item-label">Sunrise</div></div>`;
+  html += `<div><div class="sun-item-icon">◉</div><div class="sun-item-time">${fmt(solarNoon)}</div><div class="sun-item-label">Solar Noon</div></div>`;
+  html += `<div><div class="sun-item-icon">↓</div><div class="sun-item-time">${fmt(sunsetH)}</div><div class="sun-item-label">Sunset</div></div>`;
+  html += `</div>`;
+
+  html += `<div class="golden-bar">`;
+  if (isGolden) {
+    html += `<span class="golden-active">✦ Golden hour now!</span>`;
+  } else {
+    html += `Golden hour: ${fmt(sunriseH)}-${fmt(goldenMorningEnd)} / ${fmt(goldenEveningStart)}-${fmt(sunsetH)}`;
+  }
+  html += `</div>`;
+
+  document.getElementById('sun-card').innerHTML = html;
+}
+
+// ========== UI ==========
+function centerOnUser() {
+  if (userLat) map.setView([userLat, userLng], 14);
+}
+
+let panelCollapsed = false;
+function togglePanel() {
+  panelCollapsed = !panelCollapsed;
+  document.getElementById('bottom-panel').classList.toggle('collapsed', panelCollapsed);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// Hide loading screen
+setTimeout(() => document.getElementById('loading').classList.add('hidden'), 1500);
+</script>
+</body>
+</html>
