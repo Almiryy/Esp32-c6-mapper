@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "SkyCheck Slovenia",
+    "slug": "SkyCheckSlovenia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "skycheck",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a2e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.skycheck.slovenia",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "SkyCheck needs your location to check if you can fly a drone at your current position.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "SkyCheck needs your location to check drone zone restrictions."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1a2e",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.skycheck.slovenia",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "SkyCheck needs your location to check drone zone restrictions."
+        }
+      ]
+    ]
+  }
+}
